@@ -1,6 +1,10 @@
 import json
 import streamlit as st
 from src.data.templates import PROGRAM_STAGES
+from src.logic.ai_assistant import AIAssistant
+
+# Initialize AI Assistant (shared instance)
+ai_assistant = AIAssistant()
 
 class FrameworkManager:
     def __init__(self):
@@ -97,6 +101,25 @@ class FrameworkManager:
                 val = data.get(step['key'], "*(Not answered)*")
                 pdf.multi_cell(0, 6, val)
                 pdf.ln(4)
+                
+                # --- AI Suggestions in PDF ---
+                if val and val != "*(Not answered)*":
+                    suggestions = ai_assistant.get_suggestions_for_report(stage_key, val)
+                    if not suggestions.get("is_generic") and (suggestions["questions"] or suggestions["examples"]):
+                        pdf.set_font("Arial", 'I', 10)
+                        pdf.set_text_color(100, 100, 100) # Grey color
+                        
+                        pdf.cell(0, 6, "AI Assistant Insights:", 0, 1)
+                        
+                        if suggestions["questions"]:
+                             pdf.multi_cell(0, 5, "Consider: " + "; ".join(suggestions["questions"][:2]))
+                        
+                        if suggestions["examples"]:
+                             pdf.multi_cell(0, 5, "Example: " + "; ".join(suggestions["examples"][:1]))
+                             
+                        pdf.set_text_color(0, 0, 0) # Reset
+                        pdf.ln(4)
+                # -----------------------------
             
             pdf.ln(5)
             
@@ -114,7 +137,20 @@ class FrameworkManager:
             data = st.session_state.program_data.get(stage_key, {})
             for step in stage_info['steps']:
                 val = data.get(step['key'], "(Not answered)")
-                txt += f"{step['label']}:\n{val}\n\n"
+                txt += f"{step['label']}:\n{val}\n"
+                
+                # --- AI Suggestions in Text ---
+                if val and val != "(Not answered)":
+                    suggestions = ai_assistant.get_suggestions_for_report(stage_key, val)
+                    if not suggestions.get("is_generic") and (suggestions["questions"] or suggestions["examples"]):
+                        txt += "\n[AI Insights]\n"
+                        if suggestions["questions"]:
+                            txt += "Consider asking: " + "; ".join(suggestions["questions"][:2]) + "\n"
+                        if suggestions["examples"]:
+                            txt += "Reference example: " + "; ".join(suggestions["examples"][:1]) + "\n"
+                # ------------------------------
+                
+                txt += "\n"
             txt += "\n"
             
         return txt
